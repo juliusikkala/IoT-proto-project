@@ -1,0 +1,155 @@
+<button id="read">Connect with BLE device</button>
+<button id="start" disabled>Start</button>
+<button id="stop" disabled>Stop</button>
+<p id="data"></p>
+
+<script>
+    //Code adapted from the example in the following video: https://www.youtube.com/watch?v=TsXUcAKi790
+    //Final code from the video can be found on https://hutscape.com/tutorials/web-ble-gatt
+
+    var deviceName = 'Arduino'       //Add BLE device name here
+
+    //The two variables below will work if you advertise the data from the Arduino with the following UUIDs:
+    //SERVICE_UUID        "0000181a-0000-1000-8000-00805f9b34fb"
+    //CHARACTERISTIC_UUID "00002a76-0000-1000-8000-00805f9b34fb"
+    var bleService = 'environmental_sensing' 
+    var bleCharacteristics = {
+      '00002a58-0000-1000-8000-00805f9b34fb': 'temperature',
+      '00001140-0000-1000-8000-00805f9b34fb': 'red',
+      '00001141-0000-1000-8000-00805f9b34fb': 'green',
+      '00001142-0000-1000-8000-00805f9b34fb': 'blue',
+      '00001143-0000-1000-8000-00805f9b34fb': 'ambient',
+      '00001144-0000-1000-8000-00805f9b34fb': 'frequencydetect'
+    }
+
+    var valueState = {
+    };
+
+    var bluetoothDeviceDetected = null
+    var gattCharacteristics = null
+   
+    var dataDisplay = document.querySelector('#data')
+    dataDisplay.setAttribute('style', 'white-space: pre;')
+
+    document.querySelector('#read').addEventListener('click', function() {
+        if (isWebBluetoothEnabled()) { read() }
+    })
+
+    document.querySelector('#start').addEventListener('click', function(event) {
+        if (isWebBluetoothEnabled()) { start() }
+    })
+
+    document.querySelector('#stop').addEventListener('click', function(event) {
+        if (isWebBluetoothEnabled()) { stop() }
+    })
+
+    function isWebBluetoothEnabled() {
+        if (!navigator.bluetooth) {
+            console.log('Web Bluetooth API is not available in this browser!')
+            return false
+        }
+        return true
+    }
+
+    function getDeviceInfo() {
+        let options = {
+            optionalServices: [bleService],
+            filters: [
+                { "name": deviceName }
+            ]
+        }
+
+        console.log('Requesting Bluetooth Device...')
+        return navigator.bluetooth.requestDevice(options).then(device => {
+            bluetoothDeviceDetected = device
+            }).catch(error => {
+                console.log('Argh! ' + error)
+            })
+    }
+
+    function read() {
+        return (bluetoothDeviceDetected ? Promise.resolve() : getDeviceInfo())
+        .then(connectGATT)
+        .then(_ => {
+            console.log('Connected')
+        })
+        .catch(error => {
+        console.log('Error reading: ' + error)
+        })
+    }
+
+    function connectGATT() {
+        if (bluetoothDeviceDetected.gatt.connected && gattCharacteristics) {
+            return Promise.resolve()
+        }
+        return bluetoothDeviceDetected.gatt.connect()
+        .then(server => {
+            console.log('Getting GATT Service...')
+            return server.getPrimaryService(bleService)
+        })
+        .then(service => {
+            console.log('Getting GATT Characteristics...')
+            return service.getCharacteristics()
+        })
+        .then(characteristics => {
+            gattCharacteristics = characteristics
+            for(var c of gattCharacteristics) {
+                c.addEventListener('characteristicvaluechanged', handleChangedValue)
+            }
+            document.querySelector('#start').disabled = false
+            document.querySelector('#stop').disabled = true
+        })
+    }
+
+    function handleChangedValue(event) {
+        var name = bleCharacteristics[event.target.uuid]
+        var value = null;
+        if(name === "temperature") {
+          value = event.target.value.getFloat32(0, true)
+        }
+        else if(name === "frequencydetect") {
+          value = event.target.value.getUint8(0, true)
+        }
+        else {
+          value = event.target.value.getInt32(0, true)
+        }
+        valueState[name] = value
+        showValueState()
+        var now = new Date()
+        console.log('|' + now.toLocaleTimeString() + '| ' + name + ' = ' + value)
+    }
+
+    function showValueState() {
+        var text = ""
+        for(var [key, value] of Object.entries(valueState)) {
+            text += key + ": " + value + "\n"
+        }
+        dataDisplay.textContent = text
+    }
+
+    function start() {
+        for(var c of gattCharacteristics) {
+            c.startNotifications()
+            .then(_ => {
+                document.querySelector('#start').disabled = true
+                document.querySelector('#stop').disabled = false
+            })
+            .catch(error => {
+                console.log('[ERROR] Start: ' + error)
+            })
+        }
+    }
+
+    function stop() {
+        for(var c of gattCharacteristics) {
+            gattCharacteristic.stopNotifications()
+            .then(_ => {
+                document.querySelector('#start').disabled = false
+                document.querySelector('#stop').disabled = true
+            })
+            .catch(error => {
+                console.log('[ERROR] Stop: ' + error)
+            })
+        }
+    }
+</script>
