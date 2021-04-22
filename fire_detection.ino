@@ -14,11 +14,13 @@ const char* uuidOfTxCharRed = "00001140-0000-1000-8000-00805f9b34fb";
 const char* uuidOfTxCharGreen = "00001141-0000-1000-8000-00805f9b34fb";
 const char* uuidOfTxCharBlue = "00001142-0000-1000-8000-00805f9b34fb";
 const char* uuidOfTxCharAmbient = "00001143-0000-1000-8000-00805f9b34fb";
+const char* uuidOfTxCharHumidity = "00002A6F-0000-1000-8000-00805f9b34fb";
 const char* uuidOfTxCharFreq = "00001144-0000-1000-8000-00805f9b34fb";
 BLEService fireService(uuidOfService);
 const int RX_BUFFER_SIZE = 256;
 bool RX_BUFFER_FIXED_LENGTH = false;
 BLEFloatCharacteristic txChar(uuidOfTxChar, BLERead | BLENotify | BLEBroadcast); // Temperature
+BLEFloatCharacteristic txCharHumidity(uuidOfTxCharHumidity, BLERead | BLENotify | BLEBroadcast); // Humidity
 BLEIntCharacteristic txCharRed(uuidOfTxCharRed, BLERead | BLENotify | BLEBroadcast); // R
 BLEIntCharacteristic txCharGreen(uuidOfTxCharGreen, BLERead | BLENotify | BLEBroadcast); // G
 BLEIntCharacteristic txCharBlue(uuidOfTxCharBlue, BLERead | BLENotify | BLEBroadcast); // B
@@ -97,6 +99,7 @@ void setup()
   fireService.addCharacteristic(txCharGreen);
   fireService.addCharacteristic(txCharBlue);
   fireService.addCharacteristic(txCharAmbient);
+  fireService.addCharacteristic(txCharHumidity);
   fireService.addCharacteristic(txCharFreq);
   BLE.addService(fireService); 
    
@@ -167,6 +170,9 @@ void loop()
       // print an empty line
       Serial.println();
       txChar.writeValue(temperature);
+
+      float humidity = HTS.readHumidity();
+      txCharHumidity.writeValue(humidity);
       
       Serial.println(detector.detection(), DEC);
       txCharFreq.writeValue(detector.detection());
